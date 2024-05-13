@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fashion_ecommerce/users.dart';
 
 class Product {
   final String name;
@@ -7,29 +8,40 @@ class Product {
   final double price;
   final String category;
   final List<String> comments;
-  final double overallRating;
+  final List<double> ratings; 
+  double overallRating;
 
-  Product({
+   Product({
+    required this.id,
     required this.name,
     required this.vendorName,
     required this.image,
     required this.price,
     required this.category,
-    required this.comments,
+    required this.ratings,
     required this.overallRating,
   });
 
-  factory Product.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot) {
+factory Product.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot) {
     final data = snapshot.data()!;
     return Product(
+      id: snapshot.id,
       name: data['name'],
       vendorName: data['vendorName'],
       image: data['image'],
       price: data['price'],
       category: data['category'],
-      comments: [],
-      overallRating: 0.0,
+      ratings: List<double>.from(data['ratings'] ?? []),
+      overallRating: data['overallRating'] ?? 0.0,
     );
+  }
+    void updateOverallRating() {
+    if (ratings.isEmpty) {
+      overallRating = 0.0;
+    } else {
+      double sum = ratings.reduce((value, element) => value + element);
+      overallRating = sum / ratings.length;
+    }
   }
 
   Map<String, dynamic> toFirestore() {
@@ -54,6 +66,35 @@ class ProductRepository {
       throw Exception('Failed to create product: $error');
     }
   }
+Future<void> addProductRating(String productId, double rating) async {
+  try {
+    // Retrieve the currently authenticated user
+    final User? currentUser = FirebaseAuth.instance.currentUser;
+    
+    if (currentUser != null) {
+      // Check if the user has the role "shopper"
+      // Note: You may need to adjust this based on how user roles are stored in your database
+      if (currentUser.role == 'shopper') {
+        final productRef = _firestore.collection(_collectionPath).doc(productId);
+        final productDoc = await productRef.get();
+        if (productDoc.exists) {
+          final product = Product.fromFirestore(productDoc);
+          product.ratings.add(rating);
+          product.updateOverallRating();
+          await productRef.update(product.toFirestore());
+        } else {
+          throw Exception('Product not found');
+        }
+      } else {
+        throw Exception('User does not have the required role to add a rating');
+      }
+    } else {
+      throw Exception('User not authenticated');
+    }
+  } catch (error) {
+    throw Exception('Failed to add rating to product: $error');
+  }
+}
 
   Future<List<Product>> getAllProducts() async {
     try {
