@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'product.dart'; // Import ProductService
 
 
@@ -74,75 +75,98 @@ class _ProductsPageState extends State<ProductsPage> {
     final TextEditingController _vendorName = TextEditingController();
     final TextEditingController _price = TextEditingController();
     final TextEditingController _category = TextEditingController();
-    //final ImagePicker _picker = ImagePicker();
+    final ImagePicker _picker = ImagePicker();
+    String? _imagePath;
 
     showModalBottomSheet(
       context: context,
       builder: (context) {
         return Container(
           padding: EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Create Product',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 20),
-              TextField(
-                controller: _productName,
-                decoration: InputDecoration(labelText: 'Product Name'),
-              ),
-              TextField(
-                controller: _vendorName,
-                decoration: InputDecoration(labelText: 'Vendor Name'),
-              ),
-
-              TextField(
-                controller: _price,
-                decoration: InputDecoration(labelText: 'Price'),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: _category,
-                decoration: InputDecoration(labelText: 'Category'),
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () async {
-                  // Call createProduct method
-                  await createProduct(
-                    context,
-                    _productName.text.trim(),
-                    _vendorName.text.trim(),
-                    _category.text.trim(),
-                  );
-                },
-                child: Text('Create'),
-              ),
-            ],
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Create Product',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 20),
+                TextField(
+                  controller: _productName,
+                  decoration: InputDecoration(labelText: 'Product Name'),
+                ),
+                TextField(
+                  controller: _vendorName,
+                  decoration: InputDecoration(labelText: 'Vendor Name'),
+                ),
+                TextField(
+                  controller: _price,
+                  decoration: InputDecoration(labelText: 'Price'),
+                  keyboardType: TextInputType.number,
+                ),
+                TextField(
+                  controller: _category,
+                  decoration: InputDecoration(labelText: 'Category'),
+                ),
+                SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () async {
+                    final XFile? pickedImage = await _picker.pickImage(source: ImageSource.gallery);
+                    if (pickedImage != null) {
+                      _imagePath = pickedImage.path;
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('Image selected: $_imagePath'),
+                        duration: Duration(seconds: 2),
+                      ));
+                    } else {
+                      print('No image selected.');
+                    }
+                  },
+                  child: Text('Select Image'),
+                ),
+                SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (_imagePath != null) {
+                      await createProduct(
+                        context,
+                        _productName.text.trim(),
+                        _vendorName.text.trim(),
+                        _category.text.trim(),
+                        _imagePath!, // Use the path of the image file as a String
+                      );
+                    } else {
+                      print('No image selected.');
+                    }
+                  },
+                  child: Text('Create'),
+                ),
+              ],
+            ),
           ),
         );
+
       },
     );
   }
+
   Future<void> createProduct(BuildContext context, String productName, String vendorName,
-      String category) async {
+      String category, String path) async {
     print(vendorName);
 
 
     Product newProduct = Product(
       name: productName,
       vendorName: vendorName,
-      image: 'image', // Use the path of the image file as a String
+      image: path, // Use the path of the image file as a String
       price: 0, // No default price
       comments: [],
       overallRating: 0.0,
-      category: category,
+      category: category, ratings: [],
     );
 
-    // Call createProduct method from ProductService
     try {
       await _productService.createProduct(newProduct);
       _refreshProducts(); // Refresh products after creating a new one
@@ -159,3 +183,4 @@ class _ProductsPageState extends State<ProductsPage> {
     }
   }
 }
+
