@@ -164,7 +164,8 @@ class _ProductsPageState extends State<ProductsPage> {
       price: 0, // No default price
       comments: [],
       overallRating: 0.0,
-      category: category, ratings: [],
+      category: category, 
+       description: '',
     );
 
     try {
