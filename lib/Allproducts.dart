@@ -1,7 +1,5 @@
-import 'package:fashion_ecommerce/product.dart';
 import 'package:flutter/material.dart';
-import 'product.dart'; // Import ProductService
-
+import 'package:fashion_ecommerce/product.dart'; // Import Product model
 
 class ProductListScreen extends StatefulWidget {
   @override
@@ -9,8 +7,8 @@ class ProductListScreen extends StatefulWidget {
 }
 
 class _ProductListScreenState extends State<ProductListScreen> {
-  final ProductRepository _productService = ProductRepository(); // Create an instance of ProductService
-  List<Product> _products = [];
+  final ProductRepository _productRepository = ProductRepository(); // Create an instance of ProductRepository
+  late Future<List<Product>> _allProductsFuture = Future.value([]); // Initialize _allProductsFuture
 
   @override
   void initState() {
@@ -20,9 +18,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
   Future<void> _loadProducts() async {
     try {
-      final List<Product> products = await _productService.getAllProducts(); // Fetch products from ProductService
+      final List<Product> products = await _productRepository.getAllProducts(); // Fetch products from ProductRepository
       setState(() {
-        _products = products; // Update products list
+        _allProductsFuture = Future.value(products); // Update products list
       });
     } catch (error) {
       // Handle error
@@ -36,32 +34,52 @@ class _ProductListScreenState extends State<ProductListScreen> {
       appBar: AppBar(
         title: Text('Product List'),
       ),
-      body: _buildProductList(),
-    );
-  }
-
-  Widget _buildProductList() {
-    if (_products.isEmpty) {
-      // Display loading indicator if products list is empty
-      return Center(
-        child: CircularProgressIndicator(),
-      );
-    } else {
-      // Display list of products
-      return ListView.builder(
-        itemCount: _products.length,
-        itemBuilder: (BuildContext context, int index) {
-          final Product product = _products[index];
-          return ListTile(
-            title: Text(product.name),
-            subtitle: Text('\$${product.price.toStringAsFixed(2)}'),
-            onTap: () {
-              // Navigate to product detail screen
-              // You can implement this as needed
-            },
-          );
+      body: FutureBuilder<List<Product>>(
+        future: _allProductsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            // Display loading indicator if products list is empty
+            return Center(
+              child: CircularProgressIndicator(),
+            );
+          } else if (snapshot.hasError) {
+            // Handle error
+            return Center(
+              child: Text('Error: ${snapshot.error}'),
+            );
+          } else {
+            // Display list of products
+            List<Product>? products = snapshot.data;
+            if (products == null || products.isEmpty) {
+              return Center(
+                child: Text('No products available.'),
+              );
+            } else {
+              return GridView.builder(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                ),
+                itemCount: products.length,
+                itemBuilder: (context, index) {
+                  return GridTile(
+                    child: Image.network(products[index].imageUrl),
+                    footer: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(products[index].name),
+                          Text('Price: \$${products[index].price.toStringAsFixed(2)}'),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            }
+          }
         },
-      );
-    }
+      ),
+    );
   }
 }
