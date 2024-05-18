@@ -165,7 +165,7 @@ class _ProductsPageState extends State<ProductsPage> {
       comments: [],
       overallRating: 0.0,
       category: category, 
-       description: '',
+       description: '', sizes: [], unitsByColorAndSize: {},
     );
 
     try {

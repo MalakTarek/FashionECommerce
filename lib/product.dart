@@ -11,6 +11,8 @@ class Product {
   final List<String> comments;
   List<double> ratings = [];
   final double overallRating;
+  late final List<String> sizes;
+  late final Map<String, Map<String, int>> unitsByColorAndSize; 
 
   Product({
     required this.name,
@@ -21,7 +23,33 @@ class Product {
     required this.category,
     required this.description,
     required this.overallRating,
+    required this.sizes,
+    required this.unitsByColorAndSize,
   });
+    String getImage() {
+    return image;
+  }
+    void setAvailableOptions(List<String> sizes, Map<String, Map<String, int>> unitsByColorAndSize) {
+    this.sizes = sizes;
+    this.unitsByColorAndSize = unitsByColorAndSize;
+  }
+   List<String> getAvailableSizes() {
+    return sizes;
+  }
+    List<String> getAvailableColorsForSize(String size) {
+    return unitsByColorAndSize[size]?.keys.toList() ?? [];
+  }
+   int getAvailableUnitsForColorAndSize(String color, String size) {
+    return unitsByColorAndSize[size]?[color] ?? 0; 
+  }
+    List<String> getAllAvailableColors() {
+    Set<String> allColors = {};
+    for (var size in sizes) {
+      allColors.addAll(unitsByColorAndSize[size]?.keys ?? []);
+    }
+    return allColors.toList();
+  }
+
     double calculateNewPrice(double discountPercentage) {
     double discountAmount = price * (discountPercentage / 100);
     return price - discountAmount;
@@ -39,6 +67,9 @@ class Product {
     double sum = ratings.reduce((value, element) => value + element);
     return sum / ratings.length;
   }
+   String getDescription() {
+    return description;
+  }
   factory Product.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot) {
     final data = snapshot.data()!;
     return Product(
@@ -48,7 +79,7 @@ class Product {
       price: data['price'],
       category: data['category'],
       comments: [],
-      overallRating: 0.0, description: '',
+      overallRating: 0.0, description: '', sizes: [], unitsByColorAndSize: {},
     );
   }
 
@@ -68,7 +99,7 @@ class ProductRepository {
   final String _collectionPath = 'products';
 
   Future<void> createProduct(Product product) async {
-    try {
+    try {//await productRepository.createProduct(newProduct);
       await _firestore.collection(_collectionPath).add(product.toFirestore());
     } catch (error) {
       throw Exception('Failed to create product: $error');
@@ -132,6 +163,30 @@ Future<void> applyDiscountAndSetNewPrice(String productId, double discountPercen
       }
     } catch (error) {
       throw Exception('Failed to add comment to product: $error');
+    }
+  }
+    Future<String?> getProductDescription(String productId) async {
+    try {
+      final doc = await _firestore.collection(_collectionPath).doc(productId).get();
+      if (doc.exists) {
+        return Product.fromFirestore(doc).getDescription();
+      } else {
+        return null;
+      }
+    } catch (error) {
+      throw Exception('Failed to get product description: $error');
+    }
+  }
+    Future<String?> getProductImage(String productId) async {
+    try {
+      final doc = await _firestore.collection(_collectionPath).doc(productId).get();
+      if (doc.exists) {
+        return Product.fromFirestore(doc).getImage();
+      } else {
+        return null;
+      }
+    } catch (error) {
+      throw Exception('Failed to get product image: $error');
     }
   }
 }
