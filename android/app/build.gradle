@@ -27,7 +27,7 @@ if (flutterVersionName == null) {
 
 android {
     namespace "com.example.fashion_ecommerce"
-    compileSdk flutter.compileSdkVersion
+    compileSdkVersion 34 // Update this line
     ndkVersion flutter.ndkVersion
 
     compileOptions {
@@ -53,7 +53,7 @@ android {
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true
-        minSdkVersion 16
+        minSdkVersion flutter.minSdkVersion
     }
 
     buildTypes {
