@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:fashion_ecommerce/sign_up.dart';
 import 'package:fashion_ecommerce/sign_in.dart';
 import 'package:firebase_core/firebase_core.dart';
-
 import 'Allproducts.dart';
+import 'homepageDesign.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    // Handle initialization error
+    print('Error initializing Firebase: $e');
+  }
   runApp(MyApp());
 }
 
@@ -15,7 +20,16 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
+      ),
       home: HomePage(),
+      routes: {
+        '/signUp': (context) => SignUpPage(),
+        '/signIn': (context) => SignInPage(),
+        '/viewProducts': (context) => ProductListScreen(),
+      },
     );
   }
 }
@@ -27,42 +41,7 @@ class HomePage extends StatelessWidget {
       appBar: AppBar(
         title: Text('Welcome'),
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => SignUpPage()),
-                );
-              },
-              child: Text('Sign Up'),
-            ),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => SignInPage()),
-                );
-              },
-              child: Text('Sign In'),
-            ),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => ProductListScreen()), // Navigate to AllProducts screen
-                );
-              },
-              child: Text('View Products'),
-            ),
-          ],
-        ),
-      ),
+      body: CustomDesign(),
     );
   }
 }
