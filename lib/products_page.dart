@@ -164,8 +164,12 @@ class _ProductsPageState extends State<ProductsPage> {
       price: 0, // No default price
       comments: [],
       overallRating: 0.0,
+<<<<<<< HEAD
       category: category, 
        description: '', sizes: [], unitsByColorAndSize: {},
+=======
+      category: category, ratings: [],
+>>>>>>> 65646c45db8e97d19ac58d34e4b5e86be1e66776
     );
 
     try {
