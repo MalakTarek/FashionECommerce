@@ -17,6 +17,7 @@ class Product {
     required this.vendorName,
     required this.image,
     required this.price,
+    required this.comments,
     required this.category,
     required this.description,
     required this.comments,

@@ -3,6 +3,8 @@ import 'package:fashion_ecommerce/sign_up.dart';
 import 'package:fashion_ecommerce/sign_in.dart';
 import 'package:firebase_core/firebase_core.dart';
 
+import 'Allproducts.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
@@ -51,7 +53,10 @@ class HomePage extends StatelessWidget {
             SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
-                // Navigate to product listing page
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ProductListScreen()), // Navigate to AllProducts screen
+                );
               },
               child: Text('View Products'),
             ),
