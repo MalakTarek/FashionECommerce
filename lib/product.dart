@@ -1,47 +1,55 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:fashion_ecommerce/users.dart';
 
 class Product {
   final String name;
   final String vendorName;
   final String image;
   final double price;
+  double newPrice=0;
   final String category;
+  final String description; 
   final List<String> comments;
-  final List<double> ratings; 
-  double overallRating;
+  List<double> ratings = [];
+  final double overallRating;
 
-   Product({
-    required this.id,
+  Product({
     required this.name,
     required this.vendorName,
     required this.image,
     required this.price,
     required this.category,
-    required this.ratings,
+    required this.description,
+    required this.comments,
     required this.overallRating,
   });
-
-factory Product.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot) {
+    double calculateNewPrice(double discountPercentage) {
+    double discountAmount = price * (discountPercentage / 100);
+    return price - discountAmount;
+  }
+    void addRating(double rating) {
+    ratings.add(rating);
+  }
+    void addComment(String comment) {
+    comments.add(comment);
+  }
+  double calculateOverallRating() {
+    if (ratings.isEmpty) {
+      return 0.0; 
+    }
+    double sum = ratings.reduce((value, element) => value + element);
+    return sum / ratings.length;
+  }
+  factory Product.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot) {
     final data = snapshot.data()!;
     return Product(
-      id: snapshot.id,
       name: data['name'],
       vendorName: data['vendorName'],
       image: data['image'],
       price: data['price'],
       category: data['category'],
-      ratings: List<double>.from(data['ratings'] ?? []),
-      overallRating: data['overallRating'] ?? 0.0,
+      comments: [],
+      overallRating: 0.0,
     );
-  }
-    void updateOverallRating() {
-    if (ratings.isEmpty) {
-      overallRating = 0.0;
-    } else {
-      double sum = ratings.reduce((value, element) => value + element);
-      overallRating = sum / ratings.length;
-    }
   }
 
   Map<String, dynamic> toFirestore() {
@@ -66,36 +74,19 @@ class ProductRepository {
       throw Exception('Failed to create product: $error');
     }
   }
-Future<void> addProductRating(String productId, double rating) async {
-  try {
-    // Retrieve the currently authenticated user
-    final User? currentUser = FirebaseAuth.instance.currentUser;
-    
-    if (currentUser != null) {
-      // Check if the user has the role "shopper"
-      // Note: You may need to adjust this based on how user roles are stored in your database
-      if (currentUser.role == 'shopper') {
-        final productRef = _firestore.collection(_collectionPath).doc(productId);
-        final productDoc = await productRef.get();
-        if (productDoc.exists) {
-          final product = Product.fromFirestore(productDoc);
-          product.ratings.add(rating);
-          product.updateOverallRating();
-          await productRef.update(product.toFirestore());
-        } else {
-          throw Exception('Product not found');
-        }
-      } else {
-        throw Exception('User does not have the required role to add a rating');
+ 
+Future<void> applyDiscountAndSetNewPrice(String productId, double discountPercentage) async {
+    try {
+      final doc = await _firestore.collection(_collectionPath).doc(productId).get();
+      if (doc.exists) {
+        Product product = Product.fromFirestore(doc);
+        double newPrice = product.calculateNewPrice(discountPercentage);
+        await _firestore.collection(_collectionPath).doc(productId).update({'newPrice': newPrice});
       }
-    } else {
-      throw Exception('User not authenticated');
+    } catch (error) {
+      throw Exception('Failed to apply discount and set new price: $error');
     }
-  } catch (error) {
-    throw Exception('Failed to add rating to product: $error');
   }
-}
-
   Future<List<Product>> getAllProducts() async {
     try {
       final querySnapshot = await _firestore.collection(_collectionPath).get();
@@ -115,6 +106,32 @@ Future<void> addProductRating(String productId, double rating) async {
       }
     } catch (error) {
       throw Exception('Failed to get product: $error');
+    }
+  }
+     Future<void> rateProduct(String productId, double rating) async {
+    try { // pass rating from user and pass product id from firebase (current screen)
+    //await productRepository.rateProduct(productId, userRating);(how to call it with button)
+      final doc = await _firestore.collection(_collectionPath).doc(productId).get();
+      if (doc.exists) {
+        Product product = Product.fromFirestore(doc);
+        product.addRating(rating);
+        await _firestore.collection(_collectionPath).doc(productId).update({'ratings': product.ratings});
+      }
+    } catch (error) {
+      throw Exception('Failed to rate product: $error');
+    }
+  }
+  Future<void> addCommentToProduct(String productId, String comment) async {
+    try {// pass comment from user and pass product id from firebase (current screen)
+    //await productRepository.addCommentToProduct(productId, comment);(how to call it with button)
+      final doc = await _firestore.collection(_collectionPath).doc(productId).get();
+      if (doc.exists) {
+        await _firestore.collection(_collectionPath).doc(productId).update({
+          'comments': FieldValue.arrayUnion([comment])
+        });
+      }
+    } catch (error) {
+      throw Exception('Failed to add comment to product: $error');
     }
   }
 }
