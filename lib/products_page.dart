@@ -1,8 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'product.dart'; // Import ProductService
-
-
+import 'package:firebase_storage/firebase_storage.dart'; // Add this import
+import 'product.dart';
 
 class ProductsPage extends StatefulWidget {
   const ProductsPage();
@@ -12,20 +12,19 @@ class ProductsPage extends StatefulWidget {
 }
 
 class _ProductsPageState extends State<ProductsPage> {
-  late final ProductRepository _productService;
+  late final ProductRepository _productRepository;
   late Future<List<Product>> _allProductsFuture;
 
   @override
   void initState() {
     super.initState();
-    _productService = ProductRepository(); // Initialize ProductService here
-    _refreshProducts(); // Refresh products initially
+    _productRepository = ProductRepository();
+    _refreshProducts();
   }
 
-  // Add this method to refresh products
   void _refreshProducts() {
     setState(() {
-      _allProductsFuture = _productService.getAllProducts();
+      _allProductsFuture = _productRepository.getAllProducts();
     });
   }
 
@@ -48,16 +47,40 @@ class _ProductsPageState extends State<ProductsPage> {
             );
           } else {
             List<Product>? products = snapshot.data;
-            return ListView.builder(
-              itemCount: products!.length,
-              itemBuilder: (context, index) {
-                return ListTile(
-                  title: Text(products[index].name),
-                  subtitle: Text('Price: ${products[index].price.toString()}'),
-                  // Add more product attributes as needed
-                );
-              },
-            );
+            if (products == null || products.isEmpty) {
+              return Center(
+                child: Text('No products available.'),
+              );
+            } else {
+              return GridView.builder(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                ),
+                itemCount: products.length,
+                itemBuilder: (context, index) {
+                  return InkWell(
+                    onTap: () {
+                      //Navigator.push(context, MaterialPageRoute(builder: (context) => AnotherPage()));
+                    },
+                    child: GridTile(
+                      child: Image.network(products[index].imageUrl),
+                      footer: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 60.0, vertical: 0.1), // Adjust the vertical padding as needed
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(products[index].name),
+                            Text('Price: ${products[index].price.toString()}'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+
+
+            }
           }
         },
       ),
@@ -113,7 +136,8 @@ class _ProductsPageState extends State<ProductsPage> {
                 SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: () async {
-                    final XFile? pickedImage = await _picker.pickImage(source: ImageSource.gallery);
+                    final XFile? pickedImage = await _picker.pickImage(
+                        source: ImageSource.gallery);
                     if (pickedImage != null) {
                       _imagePath = pickedImage.path;
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -121,7 +145,10 @@ class _ProductsPageState extends State<ProductsPage> {
                         duration: Duration(seconds: 2),
                       ));
                     } else {
-                      print('No image selected.');
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('No image selected.'),
+                        duration: Duration(seconds: 2),
+                      ));
                     }
                   },
                   child: Text('Select Image'),
@@ -129,16 +156,25 @@ class _ProductsPageState extends State<ProductsPage> {
                 SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: () async {
-                    if (_imagePath != null) {
-                      await createProduct(
+                    if (_imagePath != null && _productName.text.isNotEmpty &&
+                        _vendorName.text.isNotEmpty && _price.text.isNotEmpty &&
+                        _category.text.isNotEmpty) {
+                      // Upload image to Firebase Storage
+                      final imageUrl = await _uploadImageToStorage(_imagePath!);
+                      await _createProduct(
                         context,
                         _productName.text.trim(),
                         _vendorName.text.trim(),
+                        double.parse(_price.text.trim()),
                         _category.text.trim(),
-                        _imagePath!, // Use the path of the image file as a String
+                        imageUrl,
                       );
                     } else {
-                      print('No image selected.');
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(
+                            'Please fill all fields and select an image.'),
+                        duration: Duration(seconds: 2),
+                      ));
                     }
                   },
                   child: Text('Create'),
@@ -147,28 +183,51 @@ class _ProductsPageState extends State<ProductsPage> {
             ),
           ),
         );
-
       },
     );
   }
 
-  Future<void> createProduct(BuildContext context, String productName, String vendorName,
-      String category, String path) async {
-    print(vendorName);
+  Future<String> _uploadImageToStorage(String imagePath) async {
+    final file = File(imagePath);
+    final fileName = imagePath
+        .split('/')
+        .last;
+    final storageRef = FirebaseStorage.instance.ref().child(
+        'product_images/$fileName');
+    final uploadTask = storageRef.putFile(file);
+    final snapshot = await uploadTask.whenComplete(() {});
+    final downloadUrl = await snapshot.ref.getDownloadURL();
+    return downloadUrl;
+  }
 
+  Future<void> _createProduct(BuildContext context, String productName,
+      String vendorName, double price, String category, String imageUrl) async {
+    if (imageUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Failed to upload image. Please try again.'),
+        duration: Duration(seconds: 2),
+      ));
+      return;
+    }
 
     Product newProduct = Product(
       name: productName,
       vendorName: vendorName,
-      image: path, // Use the path of the image file as a String
-      price: 0, // No default price
+      imageUrl: imageUrl,
+      price: price,
       comments: [],
       overallRating: 0.0,
+<<<<<<< Updated upstream
       category: category, ratings: [],
+=======
+      category: category,
+      ratings: [],
+      description: '',
+>>>>>>> Stashed changes
     );
 
     try {
-      await _productService.createProduct(newProduct);
+      await _productRepository.createProduct(newProduct);
       _refreshProducts(); // Refresh products after creating a new one
       Navigator.pop(context); // Close the bottom sheet after creating a product
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -183,4 +242,3 @@ class _ProductsPageState extends State<ProductsPage> {
     }
   }
 }
-
