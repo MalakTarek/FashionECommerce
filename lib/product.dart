@@ -139,6 +139,21 @@ Future<void> applyDiscountAndSetNewPrice(String productId, double discountPercen
       throw Exception('Failed to get product: $error');
     }
   }
+  
+  Future<void> deleteProduct(String productId) async {
+    try {
+      await _firestore.collection(_collectionPath).doc(productId).delete();
+    } catch (error) {
+      throw Exception('Failed to delete product: $error');
+    }
+  }
+    Future<void> editProductAttributes(String productId, Map<String, dynamic> updatedAttributes) async {
+    try {
+      await _firestore.collection(_collectionPath).doc(productId).update(updatedAttributes);
+    } catch (error) {
+      throw Exception('Failed to edit product attributes: $error');
+    }
+  }
      Future<void> rateProduct(String productId, double rating) async {
     try { // pass rating from user and pass product id from firebase (current screen)
     //await productRepository.rateProduct(productId, userRating);(how to call it with button)
