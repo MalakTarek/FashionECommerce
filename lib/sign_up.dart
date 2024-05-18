@@ -1,148 +1,240 @@
-// signup.dart
-
-import 'package:fashion_ecommerce/main.dart';
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'users.dart' as CustomUser;
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart'; // Add this import
+import 'product.dart';
 
-class SignUpPage extends StatelessWidget {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final CollectionReference _usersCollection =
-  FirebaseFirestore.instance.collection('users');
+class ProductsPage extends StatefulWidget {
+  const ProductsPage();
 
-  Future<void> signUp(BuildContext context, String email, String password,
-      String name, String role) async {
-    try {
-      final UserCredential userCredential =
-      await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+  @override
+  _ProductsPageState createState() => _ProductsPageState();
+}
 
-      final newUser = CustomUser.User(
-        uid: userCredential.user!.uid,
-        email: email,
-        name: name,
-        role: role,
-      );
+class _ProductsPageState extends State<ProductsPage> {
+  late final ProductRepository _productRepository;
+  late Future<List<Product>> _allProductsFuture;
 
-      await _usersCollection.doc(userCredential.user!.uid).set(newUser.toFirestore());
+  @override
+  void initState() {
+    super.initState();
+    _productRepository = ProductRepository();
+    _refreshProducts();
+  }
 
-      // Show success dialog
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text('Success'),
-            content: Text('User signed up successfully!'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: Text('OK'),
-              ),
-            ],
-          );
-        },
-      );
-    } catch (error) {
-      // Show error dialog
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text('Error'),
-            content: Text('Failed to sign up user: $error'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: Text('OK'),
-              ),
-            ],
-          );
-        },
-      );
-    }
+  void _refreshProducts() {
+    setState(() {
+      _allProductsFuture = _productRepository.getAllProducts();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Sign Up'),
+        title: Text('Products'),
       ),
-      body: SignUpForm(signUp: signUp),
+      body: FutureBuilder<List<Product>>(
+        future: _allProductsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(
+              child: CircularProgressIndicator(),
+            );
+          } else if (snapshot.hasError) {
+            return Center(
+              child: Text('Error: ${snapshot.error}'),
+            );
+          } else {
+            List<Product>? products = snapshot.data;
+            if (products == null || products.isEmpty) {
+              return Center(
+                child: Text('No products available.'),
+              );
+            } else {
+              return GridView.builder(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                ),
+                itemCount: products.length,
+                itemBuilder: (context, index) {
+                  return InkWell(
+                    onTap: () {
+                      //Navigator.push(context, MaterialPageRoute(builder: (context) => AnotherPage()));
+                    },
+                    child: GridTile(
+                      child: Image.network(products[index].imageUrl),
+                      footer: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 60.0, vertical: 0.1), // Adjust the vertical padding as needed
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(products[index].name),
+                            Text('Price: ${products[index].price.toString()}'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+
+
+            }
+          }
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          _showCreateProductBottomSheet(context);
+        },
+        child: Icon(Icons.add),
+      ),
     );
   }
-}
 
-class SignUpForm extends StatefulWidget {
-  final Function(BuildContext context, String email, String password, String name,
-      String role) signUp;
+  void _showCreateProductBottomSheet(BuildContext context) async {
+    final TextEditingController _productName = TextEditingController();
+    final TextEditingController _vendorName = TextEditingController();
+    final TextEditingController _price = TextEditingController();
+    final TextEditingController _category = TextEditingController();
+    final ImagePicker _picker = ImagePicker();
+    String? _imagePath;
 
-  SignUpForm({required this.signUp});
-
-  @override
-  _SignUpFormState createState() => _SignUpFormState();
-}
-
-class _SignUpFormState extends State<SignUpForm> {
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _nameController = TextEditingController();
-  String _selectedRole = 'Shopper';
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.all(20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextFormField(
-            controller: _emailController,
-            decoration: InputDecoration(labelText: 'Email'),
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return Container(
+          padding: EdgeInsets.all(20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Create Product',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 20),
+                TextField(
+                  controller: _productName,
+                  decoration: InputDecoration(labelText: 'Product Name'),
+                ),
+                TextField(
+                  controller: _vendorName,
+                  decoration: InputDecoration(labelText: 'Vendor Name'),
+                ),
+                TextField(
+                  controller: _price,
+                  decoration: InputDecoration(labelText: 'Price'),
+                  keyboardType: TextInputType.number,
+                ),
+                TextField(
+                  controller: _category,
+                  decoration: InputDecoration(labelText: 'Category'),
+                ),
+                SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () async {
+                    final XFile? pickedImage = await _picker.pickImage(
+                        source: ImageSource.gallery);
+                    if (pickedImage != null) {
+                      _imagePath = pickedImage.path;
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('Image selected: $_imagePath'),
+                        duration: Duration(seconds: 2),
+                      ));
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('No image selected.'),
+                        duration: Duration(seconds: 2),
+                      ));
+                    }
+                  },
+                  child: Text('Select Image'),
+                ),
+                SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (_imagePath != null && _productName.text.isNotEmpty &&
+                        _vendorName.text.isNotEmpty && _price.text.isNotEmpty &&
+                        _category.text.isNotEmpty) {
+                      // Upload image to Firebase Storage
+                      final imageUrl = await _uploadImageToStorage(_imagePath!);
+                      await _createProduct(
+                        context,
+                        _productName.text.trim(),
+                        _vendorName.text.trim(),
+                        double.parse(_price.text.trim()),
+                        _category.text.trim(),
+                        imageUrl,
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(
+                            'Please fill all fields and select an image.'),
+                        duration: Duration(seconds: 2),
+                      ));
+                    }
+                  },
+                  child: Text('Create'),
+                ),
+              ],
+            ),
           ),
-          TextFormField(
-            controller: _passwordController,
-            decoration: InputDecoration(labelText: 'Password'),
-            obscureText: true,
-          ),
-          TextFormField(
-            controller: _nameController,
-            decoration: InputDecoration(labelText: 'Name'),
-          ),
-          SizedBox(height: 20.0),
-          DropdownButtonFormField<String>(
-            value: _selectedRole,
-            onChanged: (String? newValue) {
-              setState(() {
-                _selectedRole = newValue!;
-              });
-            },
-            items: <String>['Shopper', 'Vendor'].map<DropdownMenuItem<String>>((String value) {
-              return DropdownMenuItem<String>(
-                value: value,
-                child: Text(value),
-              );
-            }).toList(),
-          ),
-          SizedBox(height: 20.0),
-          ElevatedButton(
-            onPressed: () {
-              final email = _emailController.text.trim();
-              final password = _passwordController.text;
-              final name = _nameController.text.trim();
-              widget.signUp(context, email, password, name, _selectedRole);
-            },
-            child: Text('Sign Up'),
-          ),
-        ],
-      ),
+        );
+      },
     );
+  }
+
+  Future<String> _uploadImageToStorage(String imagePath) async {
+    final file = File(imagePath);
+    final fileName = imagePath
+        .split('/')
+        .last;
+    final storageRef = FirebaseStorage.instance.ref().child(
+        'product_images/$fileName');
+    final uploadTask = storageRef.putFile(file);
+    final snapshot = await uploadTask.whenComplete(() {});
+    final downloadUrl = await snapshot.ref.getDownloadURL();
+    return downloadUrl;
+  }
+
+  Future<void> _createProduct(BuildContext context, String productName,
+      String vendorName, double price, String category, String imageUrl) async {
+    if (imageUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Failed to upload image. Please try again.'),
+        duration: Duration(seconds: 2),
+      ));
+      return;
+    }
+
+    Product newProduct = Product(
+      name: productName,
+      vendorName: vendorName,
+      imageUrl: imageUrl,
+      price: price,
+      comments: [],
+      overallRating: 0.0,
+      category: category,
+      ratings: [],
+      description: '',
+    );
+
+    try {
+      await _productRepository.createProduct(newProduct);
+      _refreshProducts(); // Refresh products after creating a new one
+      Navigator.pop(context); // Close the bottom sheet after creating a product
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Product created successfully!'),
+        duration: Duration(seconds: 2),
+      ));
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Failed to create product: $error'),
+        duration: Duration(seconds: 2),
+      ));
+    }
   }
 }
