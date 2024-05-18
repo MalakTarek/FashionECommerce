@@ -12,6 +12,17 @@ class User {
     required this.name,
     required this.role,
   });
+  List<String> wishlist = [];
+
+  void addToWishlist(String productId) {
+    if (!wishlist.contains(productId)) {
+      wishlist.add(productId);
+    }
+  }
+
+  void removeFromWishlist(String productId) {
+    wishlist.remove(productId);
+  }
 
   factory User.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot) {
     final data = snapshot.data()!;
@@ -57,6 +68,25 @@ class UserRepository {
     } catch (error) {
       // Handle errors (e.g., print error message)
       throw Exception('Failed to get user: $error');
+    }
+  }
+    Future<void> addToWishlist(String userId, String productId) async {
+    try {
+      await _firestore.collection(_collectionPath).doc(userId).update({
+        'wishlist': FieldValue.arrayUnion([productId])
+      });
+    } catch (error) {
+      throw Exception('Failed to add product to wishlist: $error');
+    }
+  }
+
+  Future<void> removeFromWishlist(String userId, String productId) async {
+    try {
+      await _firestore.collection(_collectionPath).doc(userId).update({
+        'wishlist': FieldValue.arrayRemove([productId])
+      });
+    } catch (error) {
+      throw Exception('Failed to remove product from wishlist: $error');
     }
   }
 }
