@@ -20,7 +20,6 @@ class Product {
     required this.comments,
     required this.category,
     required this.description,
-    required this.comments,
     required this.overallRating,
   });
     double calculateNewPrice(double discountPercentage) {
@@ -49,7 +48,7 @@ class Product {
       price: data['price'],
       category: data['category'],
       comments: [],
-      overallRating: 0.0,
+      overallRating: 0.0, description: '',
     );
   }
 
