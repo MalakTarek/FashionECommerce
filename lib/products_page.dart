@@ -181,7 +181,7 @@ class _ProductsPageState extends State<ProductsPage> {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       DocumentSnapshot doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      bool isVendor = doc['role'] == 'vendor'; // Assuming 'role' field in user document
+      bool isVendor = doc['role'] == 'Vendor'; // Assuming 'role' field in user document
       if (isVendor) {
         final TextEditingController _productName = TextEditingController();
         final TextEditingController _vendorName = TextEditingController();
@@ -315,7 +315,6 @@ class _ProductsPageState extends State<ProductsPage> {
       comments: [],
       overallRating: 0.0,
       category: category,
-      ratings: [],
       description: '',
       sizes: [],
       unitsByColorAndSize: {},
