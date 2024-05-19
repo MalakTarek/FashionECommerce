@@ -1,19 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:fashion_ecommerce/users.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+
 class Product {
   final String name;
   final String vendorName;
   final String imageUrl;
   final double price;
+  double newPrice=0;
   final String category;
-<<<<<<< Updated upstream
-=======
   final String description;
->>>>>>> Stashed changes
   final List<String> comments;
-  final List<double> ratings;
-  double overallRating;
+  List<double> ratings = [];
+  final double overallRating;
+  late final List<String> sizes;
+  late final Map<String, Map<String, int>> unitsByColorAndSize;
 
   Product({
     required this.name,
@@ -22,13 +23,35 @@ class Product {
     required this.price,
     required this.comments,
     required this.category,
-    required this.ratings,
+    required this.description,
     required this.overallRating,
-    required List ratings,
+    required this.sizes,
+    required this.unitsByColorAndSize,
   });
-<<<<<<< Updated upstream
+  String getImage() {
+    return imageUrl;
+  }
+  void setAvailableOptions(List<String> sizes, Map<String, Map<String, int>> unitsByColorAndSize) {
+    this.sizes = sizes;
+    this.unitsByColorAndSize = unitsByColorAndSize;
+  }
+  List<String> getAvailableSizes() {
+    return sizes;
+  }
+  List<String> getAvailableColorsForSize(String size) {
+    return unitsByColorAndSize[size]?.keys.toList() ?? [];
+  }
+  int getAvailableUnitsForColorAndSize(String color, String size) {
+    return unitsByColorAndSize[size]?[color] ?? 0;
+  }
+  List<String> getAllAvailableColors() {
+    Set<String> allColors = {};
+    for (var size in sizes) {
+      allColors.addAll(unitsByColorAndSize[size]?.keys ?? []);
+    }
+    return allColors.toList();
+  }
 
-=======
   double calculateNewPrice(double discountPercentage) {
     double discountAmount = price * (discountPercentage / 100);
     return price - discountAmount;
@@ -46,7 +69,9 @@ class Product {
     double sum = ratings.reduce((value, element) => value + element);
     return sum / ratings.length;
   }
->>>>>>> Stashed changes
+  String getDescription() {
+    return description;
+  }
   factory Product.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot) {
     final data = snapshot.data()!;
     return Product(
@@ -55,22 +80,9 @@ class Product {
       imageUrl: data['image'],
       price: data['price'],
       category: data['category'],
-<<<<<<< Updated upstream
-      ratings: List<double>.from(data['ratings'] ?? []),
-      overallRating: data['overallRating'] ?? 0.0, comments: [],
-=======
       comments: [],
-      overallRating: 0.0, description: '', ratings: [],
->>>>>>> Stashed changes
+      overallRating: 0.0, description: '', sizes: [], unitsByColorAndSize: {},
     );
-  }
-  void updateOverallRating() {
-    if (ratings.isEmpty) {
-      overallRating = 0.0;
-    } else {
-      double sum = ratings.reduce((value, element) => value + element);
-      overallRating = sum / ratings.length;
-    }
   }
 
   Map<String, dynamic> toFirestore() {
@@ -86,50 +98,88 @@ class Product {
 
 class ProductRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final String _collectionPath = 'products';
 
   Future<void> createProduct(Product product) async {
-    try {
+    try {//await productRepository.createProduct(newProduct);
       await _firestore.collection(_collectionPath).add(product.toFirestore());
+      await _sendNewProductNotification(product);
     } catch (error) {
       throw Exception('Failed to create product: $error');
     }
   }
-
-<<<<<<< Updated upstream
-  /*Future<void> addProductRating(String productId, double rating) async {
-=======
-  Future<void> applyDiscountAndSetNewPrice(String productId, double discountPercentage) async {
->>>>>>> Stashed changes
+  Future<void> _sendNewProductNotification(Product product) async {
     try {
+      // Fetch all users with role "shopper"
+      final shoppersQuerySnapshot = await _firestore.collection('users')
+          .where('role', isEqualTo: 'shopper')
+          .get();
 
-      if (currentUser != null) {
-        // Check if the user has the role "shopper"
-        // Note: You may need to adjust this based on how user roles are stored in your database
-        if (currentUser.role == 'shopper') {
-          final productRef = _firestore.collection(_collectionPath).doc(productId);
-          final productDoc = await productRef.get();
-          if (productDoc.exists) {
-            final product = Product.fromFirestore(productDoc);
-            product.ratings.add(rating);
-            product.updateOverallRating();
-            await productRef.update(product.toFirestore());
-          } else {
-            throw Exception('Product not found');
-          }
-        } else {
-          throw Exception('User does not have the required role to add a rating');
+      // Extract FCM tokens
+      List<String> fcmTokens = [];
+      for (var doc in shoppersQuerySnapshot.docs) {
+        String? token = doc.data()['fcmToken'];
+        if (token != null) {
+          fcmTokens.add(token);
         }
-      } else {
-        throw Exception('User not authenticated');
+      }
+
+      // Send push notifications to all shoppers
+      for (String token in fcmTokens) {
+        await _sendPushNotification(
+            token,
+            'New Product Alert!',
+            'A new product "${product.name}" has been added by ${product.vendorName}. Check it out now!'
+        );
       }
     } catch (error) {
-      throw Exception('Failed to add rating to product: $error');
+      throw Exception('Failed to send new product notification: $error');
     }
   }
-
-   */
-
+  Future<void> _sendPushNotification(String token, String title, String body) async {
+    try {
+      // ignore: deprecated_member_use
+      await _messaging.sendMessage(
+          to: token,
+          data: {
+            'title': title,
+            'body': body,
+          }
+      );
+    } catch (error) {
+      throw Exception('Failed to send push notification: $error');
+    }
+  }
+  Future<void> applyDiscountAndSetNewPrice(String productId, double discountPercentage) async {
+    try {
+      final doc = await _firestore.collection(_collectionPath).doc(productId).get();
+      if (doc.exists) {
+        Product product = Product.fromFirestore(doc);
+        double newPrice = product.calculateNewPrice(discountPercentage);
+        await _firestore.collection(_collectionPath).doc(productId).update({'newPrice': newPrice});
+        final shoppersQuerySnapshot = await _firestore.collection('users')
+            .where('role', isEqualTo: 'shopper')
+            .get();
+        List<String> fcmTokens = [];
+        for (var doc in shoppersQuerySnapshot.docs) {
+          String? token = doc.data()['fcmToken'];
+          if (token != null) {
+            fcmTokens.add(token);
+          }
+          for (String token in fcmTokens) {
+            await _sendPushNotification(
+                token,
+                'Discount Alert!',
+                'The product "${product.name}" is now available at a $discountPercentage% discount. New Price: \$${newPrice.toStringAsFixed(2)}'
+            );
+          }
+        }
+      }
+    } catch (error) {
+      throw Exception('Failed to apply discount and set new price: $error');
+    }
+  }
   Future<List<Product>> getAllProducts() async {
     try {
       final querySnapshot = await _firestore.collection(_collectionPath).get();
@@ -151,8 +201,21 @@ class ProductRepository {
       throw Exception('Failed to get product: $error');
     }
   }
-<<<<<<< Updated upstream
-=======
+
+  Future<void> deleteProduct(String productId) async {
+    try {
+      await _firestore.collection(_collectionPath).doc(productId).delete();
+    } catch (error) {
+      throw Exception('Failed to delete product: $error');
+    }
+  }
+  Future<void> editProductAttributes(String productId, Map<String, dynamic> updatedAttributes) async {
+    try {
+      await _firestore.collection(_collectionPath).doc(productId).update(updatedAttributes);
+    } catch (error) {
+      throw Exception('Failed to edit product attributes: $error');
+    }
+  }
   Future<void> rateProduct(String productId, double rating) async {
     try { // pass rating from user and pass product id from firebase (current screen)
       //await productRepository.rateProduct(productId, userRating);(how to call it with button)
@@ -174,10 +237,46 @@ class ProductRepository {
         await _firestore.collection(_collectionPath).doc(productId).update({
           'comments': FieldValue.arrayUnion([comment])
         });
+        final product = Product.fromFirestore(doc);
+
+        // Fetch vendor's FCM token
+        final vendorDoc = await _firestore.collection('users').doc(product.vendorName).get();
+        final vendorToken = vendorDoc.data()?['fcmToken'];
+
+        if (vendorToken != null) {
+          await _sendPushNotification(
+              vendorToken,
+              'New Comment on Your Product',
+              'A new comment has been added to your product "${product.name}": $comment'
+          );
+        }
       }
     } catch (error) {
       throw Exception('Failed to add comment to product: $error');
     }
   }
->>>>>>> Stashed changes
+  Future<String?> getProductDescription(String productId) async {
+    try {
+      final doc = await _firestore.collection(_collectionPath).doc(productId).get();
+      if (doc.exists) {
+        return Product.fromFirestore(doc).getDescription();
+      } else {
+        return null;
+      }
+    } catch (error) {
+      throw Exception('Failed to get product description: $error');
+    }
+  }
+  Future<String?> getProductImage(String productId) async {
+    try {
+      final doc = await _firestore.collection(_collectionPath).doc(productId).get();
+      if (doc.exists) {
+        return Product.fromFirestore(doc).getImage();
+      } else {
+        return null;
+      }
+    } catch (error) {
+      throw Exception('Failed to get product image: $error');
+    }
+  }
 }
