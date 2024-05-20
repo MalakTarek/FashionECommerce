@@ -1,14 +1,18 @@
 import 'package:fashion_ecommerce/product.dart';
 
+import 'shipping.dart';
+
 class Order {
   final List<Product> products;
   final DateTime date;
   final double totalPrice;
+  final Shipping shipping;
 
   Order({
     required this.products,
     required this.date,
     required this.totalPrice,
+    required this.shipping,
   });
 
   Map<String, dynamic> toMap() {
@@ -16,6 +20,7 @@ class Order {
       'products': products.map((product) => productToMap(product)).toList(),
       'date': date.toIso8601String(),
       'totalPrice': totalPrice,
+      'shipping': shipping.toMap(),
     };
   }
 
@@ -24,6 +29,7 @@ class Order {
       products: List<Product>.from(map['products']?.map((productMap) => productFromMap(productMap)) ?? []),
       date: DateTime.parse(map['date']),
       totalPrice: map['totalPrice'],
+      shipping: Shipping.fromMap(map['shipping']),
     );
   }
 
