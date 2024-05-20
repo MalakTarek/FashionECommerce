@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'product.dart';
-import 'users.dart';
-import 'order.dart' as orders;  // Alias the order import to avoid naming conflict
 import 'shipping.dart';
+import 'order.dart' as orders;
 
 class Cart {
   List<Product> products = [];
@@ -39,15 +39,21 @@ class Cart {
     return cartContents;
   }
 
-  Future<void> placeOrder(User user, Shipping shipping) async {
-    orders.Order order = orders.Order( // Use the alias 'orders' to refer to the Order class
-      products: List<Product>.from(products),  // Create a new list to avoid issues with clearing
+  Future<void> placeOrder(Shipping shipping) async {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      throw Exception('No user is currently signed in.');
+    }
+    String uid = currentUser.uid;
+
+    orders.Order order = orders.Order(
+      products: List<Product>.from(products), // Create a new list to avoid issues with clearing
       date: DateTime.now(),
       totalPrice: calculateTotalPrice(),
       shipping: shipping,
     );
 
-    await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+    await FirebaseFirestore.instance.collection('users').doc(uid).update({
       'orders': FieldValue.arrayUnion([order.toMap()])
     });
     

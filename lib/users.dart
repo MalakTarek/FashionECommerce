@@ -1,23 +1,26 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'order.dart' as orders;
 
 class User {
   final String uid;
   final String email;
   final String name;
   final String role;
-  List<Order> orders = [];
+  List<orders.Order> ordersList = [];
+  List<String> wishlist = [];
 
   User({
     required this.uid,
     required this.email,
     required this.name,
     required this.role,
-    this.orders = const [],
+    this.ordersList = const [],
+    this.wishlist = const [],
   });
-    void addOrder(Order order) {
-    orders.add(order);
+
+  void addOrder(orders.Order order) {
+    ordersList.add(order);
   }
-  List<String> wishlist = [];
 
   void addToWishlist(String productId) {
     if (!wishlist.contains(productId)) {
@@ -36,6 +39,10 @@ class User {
       email: data['email'],
       name: data['name'],
       role: data['role'],
+      ordersList: (data['orders'] as List<dynamic>)
+          .map((order) => orders.Order.fromMap(order))
+          .toList(),
+      wishlist: List<String>.from(data['wishlist'] ?? []),
     );
   }
 
@@ -45,53 +52,8 @@ class User {
       'email': email,
       'name': name,
       'role': role,
+      'orders': ordersList.map((order) => order.toMap()).toList(),
+      'wishlist': wishlist,
     };
-  }
-}
-
-class UserRepository {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final String _collectionPath = 'users';
-
-  Future<void> createUser(User user) async {
-    try {
-      await _firestore.collection(_collectionPath).doc(user.uid).set(user.toFirestore());
-    } catch (error) {
-      // Handle errors (e.g., print error message)
-      throw Exception('Failed to create user: $error');
-    }
-  }
-
-  Future<User?> getUser(String uid) async {
-    try {
-      final doc = await _firestore.collection(_collectionPath).doc(uid).get();
-      if (doc.exists) {
-        return User.fromFirestore(doc);
-      } else {
-        return null;
-      }
-    } catch (error) {
-      // Handle errors (e.g., print error message)
-      throw Exception('Failed to get user: $error');
-    }
-  }
-    Future<void> addToWishlist(String userId, String productId) async {
-    try {
-      await _firestore.collection(_collectionPath).doc(userId).update({
-        'wishlist': FieldValue.arrayUnion([productId])
-      });
-    } catch (error) {
-      throw Exception('Failed to add product to wishlist: $error');
-    }
-  }
-
-  Future<void> removeFromWishlist(String userId, String productId) async {
-    try {
-      await _firestore.collection(_collectionPath).doc(userId).update({
-        'wishlist': FieldValue.arrayRemove([productId])
-      });
-    } catch (error) {
-      throw Exception('Failed to remove product from wishlist: $error');
-    }
   }
 }

@@ -1,5 +1,4 @@
-import 'package:fashion_ecommerce/product.dart';
-
+import 'product.dart';
 import 'shipping.dart';
 
 class Order {
