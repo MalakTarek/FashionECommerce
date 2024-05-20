@@ -1,6 +1,7 @@
-// ignore_for_file: avoid_print
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'product.dart';
+import 'users.dart';
+import 'order.dart' as orders;  
 
 class Cart {
   List<Product> products = [];
@@ -14,7 +15,7 @@ class Cart {
     return totalPrice + 3.99 + 2.00; // Add shipping of 3.99 and taxes of 2.00
   }
 
-   Map<String, dynamic> generateOrderSummary() {
+  Map<String, dynamic> generateOrderSummary() {
     double totalPrice = calculateTotalPrice();
     double subtotal = totalPrice - 3.99 - 2.00;
     return {
@@ -36,6 +37,19 @@ class Cart {
     }
     return cartContents;
   }
+
+  Future<void> placeOrder(User user) async {
+    orders.Order order = orders.Order(
+      products: List<Product>.from(products),  // Create a new list to avoid issues with clearing
+      date: DateTime.now(),
+      totalPrice: calculateTotalPrice(),
+    );
+
+    await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+      'orders': FieldValue.arrayUnion([order.toMap()])
+    });
+    
+    // Clear the cart after placing the order
+    products.clear();
   }
-
-
+}

@@ -5,13 +5,18 @@ class User {
   final String email;
   final String name;
   final String role;
+  List<Order> orders = [];
 
   User({
     required this.uid,
     required this.email,
     required this.name,
     required this.role,
+    this.orders = const [],
   });
+    void addOrder(Order order) {
+    orders.add(order);
+  }
   List<String> wishlist = [];
 
   void addToWishlist(String productId) {
