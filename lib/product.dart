@@ -254,6 +254,17 @@ Future<void> createProduct(Product product) async {
       throw Exception('Failed to add comment to product: $error');
     }
   }
+   Future<List<Product>> getVendorProducts(String vendorName) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection(_collectionPath)
+          .where('vendorName', isEqualTo: vendorName)
+          .get();
+      return querySnapshot.docs.map((doc) => Product.fromFirestore(doc)).toList();
+    } catch (error) {
+      throw Exception('Failed to get vendor products: $error');
+    }
+  }
 
   Future<String?> getProductDescription(String productId) async {
     try {
