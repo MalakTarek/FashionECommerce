@@ -8,7 +8,7 @@ class Product {
   final String vendorName;
   final String image;
   final double price;
-  double newPrice = 0;
+  double newPrice;
   final Category category;
   final String description;
   final List<String> comments;
@@ -16,6 +16,7 @@ class Product {
   final double overallRating;
   late final List<String> sizes;
   late final Map<String, Map<String, int>> unitsByColorAndSize;
+  bool isDiscounted;
 
   Product( {
     required this.name,
@@ -28,11 +29,14 @@ class Product {
     required this.overallRating,
     required this.sizes,
     required this.unitsByColorAndSize,
+    this.newPrice = 0.0,
+    this.isDiscounted = false,
   });
 
   String getImage() {
     return image;
   }
+  
 
   void setAvailableOptions(List<String> sizes, Map<String, Map<String, int>> unitsByColorAndSize) {
     this.sizes = sizes;
@@ -92,12 +96,14 @@ class Product {
       vendorName: data['vendorName'],
       image: data['image'],
       price: data['price'],
-      category: CategoryExtension.fromString(data['category']),
-      comments: [],
-      overallRating: 0.0,
-      description: '',
-      sizes: [],
-      unitsByColorAndSize: {}, 
+     category: CategoryExtension.fromString(data['category']),
+      comments: List<String>.from(data['comments'] ?? []),
+      overallRating: data['overallRating'].toDouble(),
+      description: data['description'],
+      sizes: List<String>.from(data['sizes'] ?? []),
+      unitsByColorAndSize: Map<String, Map<String, int>>.from(data['unitsByColorAndSize'] ?? {}),
+      newPrice: data['newPrice'].toDouble(),
+      isDiscounted: data['isDiscounted'] ?? false,
     );
   }
 
@@ -108,6 +114,13 @@ class Product {
       'image': image,
       'price': price,
       'category': category,
+      'comments': comments,
+      'overallRating': overallRating,
+      'description': description,
+      'sizes': sizes,
+      'unitsByColorAndSize': unitsByColorAndSize,
+      'newPrice': newPrice,
+      'isDiscounted': isDiscounted,
     };
   }
 }
@@ -146,6 +159,19 @@ Future<void> createProduct(Product product) async {
       throw Exception('Failed to create product: $error');
     }
   }
+ Future<bool> isProductDiscounted(String productId) async {
+    try {
+      final doc = await _firestore.collection(_collectionPath).doc(productId).get();
+      if (doc.exists) {
+        bool isDiscounted = doc.data()?['isDiscounted'] ?? false;
+        return isDiscounted;
+      } else {
+        throw Exception('Product not found');
+      }
+    } catch (error) {
+      throw Exception('Failed to check if product is discounted: $error');
+    }
+  }
 
   Future<void> applyDiscountAndSetNewPrice(String productId, double discountPercentage) async {
     try {
@@ -153,8 +179,12 @@ Future<void> createProduct(Product product) async {
       if (doc.exists) {
         Product product = Product.fromFirestore(doc);
         double newPrice = product.calculateNewPrice(discountPercentage);
-        await _firestore.collection(_collectionPath).doc(productId).update({'newPrice': newPrice});
+        await _firestore.collection(_collectionPath).doc(productId).update({
+          'newPrice': newPrice,
+          'isDiscounted': true,
+        });
 
+        // Send notifications to shoppers
         final shoppersQuerySnapshot = await _firestore.collection('users')
             .where('role', isEqualTo: 'shopper')
             .get();
@@ -177,7 +207,7 @@ Future<void> createProduct(Product product) async {
       throw Exception('Failed to apply discount and set new price: $error');
     }
   }
-
+  
   Future<List<Product>> getAllProducts() async {
     try {
       final querySnapshot = await _firestore.collection(_collectionPath).get();
