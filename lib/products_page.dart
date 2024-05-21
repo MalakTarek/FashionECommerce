@@ -61,11 +61,11 @@ class _ProductsPageState extends State<ProductsPage> {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            DrawerHeader(
-              child: Text('Menu'),
+             DrawerHeader(
               decoration: BoxDecoration(
-                color: Colors.blue,
+                color: Color(0xFFE1BFAA),
               ),
+              child: Text('Menu'),
             ),
             ListTile(
               leading: Icon(Icons.account_circle),
@@ -92,9 +92,16 @@ class _ProductsPageState extends State<ProductsPage> {
             ListTile(
               leading: Icon(Icons.logout),
               title: Text('Logout'),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context); // Close the drawer
-                FirebaseAuth.instance.signOut();
+                await FirebaseAuth.instance.signOut();
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.remove('idToken');
+                await prefs.remove('expirationTime');
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => HomePage()),
+                );
               },
             ),
           ],
