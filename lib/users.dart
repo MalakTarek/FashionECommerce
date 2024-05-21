@@ -57,3 +57,47 @@ class User {
     };
   }
 }
+class UserRepository {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final String _collectionPath = 'users';
+
+  Future<User?> getUserProfile(String uid) async {
+    try {
+      final doc = await _firestore.collection(_collectionPath).doc(uid).get();
+      if (doc.exists) {
+        return User.fromFirestore(doc);
+      } else {
+        return null;
+      }
+    } catch (error) {
+      throw Exception('Failed to get user profile: $error');
+    }
+  }
+
+  Future<void> updateUserProfile(String uid, Map<String, dynamic> updatedData) async {
+    try {
+      await _firestore.collection(_collectionPath).doc(uid).update(updatedData);
+    } catch (error) {
+      throw Exception('Failed to update user profile: $error');
+    }
+  }
+  Future<void> addToWishlist(String uid, String productId) async {
+    try {
+      await _firestore.collection(_collectionPath).doc(uid).update({
+        'wishlist': FieldValue.arrayUnion([productId])
+      });
+    } catch (error) {
+      throw Exception('Failed to add to wishlist: $error');
+    }
+  }
+
+  Future<void> removeFromWishlist(String uid, String productId) async {
+    try {
+      await _firestore.collection(_collectionPath).doc(uid).update({
+        'wishlist': FieldValue.arrayRemove([productId])
+      });
+    } catch (error) {
+      throw Exception('Failed to remove from wishlist: $error');
+    }
+  }
+}
