@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fashion_ecommerce/product.dart';
 import 'order.dart' as orders;
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -8,7 +9,7 @@ class User {
   final String name;
   final String role;
   List<orders.Order> ordersList;
-  List<String> wishlist;
+  List<Product> wishlist;
 
   User({
     required this.uid,
@@ -23,14 +24,14 @@ class User {
     ordersList.add(order);
   }
 
-  void addToWishlist(String productId) {
-    if (!wishlist.contains(productId)) {
-      wishlist.add(productId);
+  void addToWishlist(Product product) {
+    if (!wishlist.contains(product)) {
+      wishlist.add(product);
     }
   }
 
-  void removeFromWishlist(String productId) {
-    wishlist.remove(productId);
+  void removeFromWishlist(Product product) {
+    wishlist.remove(product);
   }
 
   factory User.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot) {
@@ -43,7 +44,9 @@ class User {
       ordersList: (data['orders'] as List<dynamic>)
           .map((order) => orders.Order.fromMap(order))
           .toList(),
-      wishlist: List<String>.from(data['wishlist'] ?? []),
+      wishlist: (data['wishlist'] as List<dynamic>)
+          .map((item) => Product.fromFirestore(item))
+          .toList(),
     );
   }
 
@@ -54,11 +57,10 @@ class User {
       'name': name,
       'role': role,
       'orders': ordersList.map((order) => order.toMap()).toList(),
-      'wishlist': wishlist,
+      'wishlist': wishlist.map((product) => product.toFirestore()).toList(),
     };
   }
 }
-
 class UserRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String _collectionPath = 'users';
@@ -85,39 +87,57 @@ class UserRepository {
     }
   }
 
-  Future<void> addToWishlist(String uid, String productId) async {
+  Future<void> addToWishlist(String uid, Product product) async {
     try {
       await _firestore.collection(_collectionPath).doc(uid).update({
-        'wishlist': FieldValue.arrayUnion([productId])
+        'wishlist': FieldValue.arrayUnion([product.toFirestore()])
       });
     } catch (error) {
       throw Exception('Failed to add to wishlist: $error');
     }
   }
 
-  Future<void> removeFromWishlist(String uid, String productId) async {
+  Future<void> removeFromWishlist(String uid, Product product) async {
     try {
       await _firestore.collection(_collectionPath).doc(uid).update({
-        'wishlist': FieldValue.arrayRemove([productId])
+        'wishlist': FieldValue.arrayRemove([product.toFirestore()])
       });
     } catch (error) {
       throw Exception('Failed to remove from wishlist: $error');
     }
   }
 
-  Future<List<String>> getWishlist() async {
+  Future<List<Product>> getWishlist() async {
     try {
       final uid = _auth.currentUser?.uid;
       if (uid != null) {
         final doc = await _firestore.collection(_collectionPath).doc(uid).get();
         if (doc.exists) {
           final data = doc.data();
-          return List<String>.from(data?['wishlist'] ?? []);
+          return (data?['wishlist'] as List<dynamic>)
+              .map((item) => Product.fromFirestore(item))
+              .toList();
         }
       }
       return [];
     } catch (error) {
       throw Exception('Failed to get wishlist: $error');
+    }
+  }
+
+  Future<String?> getUserRole() async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid != null) {
+        final doc = await _firestore.collection(_collectionPath).doc(uid).get();
+        if (doc.exists) {
+          final data = doc.data();
+          return data?['role'];
+        }
+      }
+      return null;
+    } catch (error) {
+      throw Exception('Failed to get user role: $error');
     }
   }
 }
