@@ -1,13 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'order.dart' as orders;
+import 'package:firebase_auth/firebase_auth.dart';
 
 class User {
   final String uid;
   final String email;
   final String name;
   final String role;
-  List<orders.Order> ordersList = [];
-  List<String> wishlist = [];
+  List<orders.Order> ordersList;
+  List<String> wishlist;
 
   User({
     required this.uid,
@@ -57,9 +58,11 @@ class User {
     };
   }
 }
+
 class UserRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String _collectionPath = 'users';
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   Future<User?> getUserProfile(String uid) async {
     try {
@@ -81,6 +84,7 @@ class UserRepository {
       throw Exception('Failed to update user profile: $error');
     }
   }
+
   Future<void> addToWishlist(String uid, String productId) async {
     try {
       await _firestore.collection(_collectionPath).doc(uid).update({
@@ -98,6 +102,22 @@ class UserRepository {
       });
     } catch (error) {
       throw Exception('Failed to remove from wishlist: $error');
+    }
+  }
+
+  Future<List<String>> getWishlist() async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid != null) {
+        final doc = await _firestore.collection(_collectionPath).doc(uid).get();
+        if (doc.exists) {
+          final data = doc.data();
+          return List<String>.from(data?['wishlist'] ?? []);
+        }
+      }
+      return [];
+    } catch (error) {
+      throw Exception('Failed to get wishlist: $error');
     }
   }
 }
