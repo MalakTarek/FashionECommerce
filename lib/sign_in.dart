@@ -1,240 +1,140 @@
-import 'dart:io';
+import 'package:fashion_ecommerce/products_page.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart'; // Add this import
-import 'product.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class ProductsPage extends StatefulWidget {
-  const ProductsPage();
+class SignInPage extends StatelessWidget {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  @override
-  _ProductsPageState createState() => _ProductsPageState();
-}
+  Future<void> signIn(BuildContext context, String email, String password) async {
+    try {
+      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      IdTokenResult? idTokenResult = await userCredential.user?.getIdTokenResult();
+      if (idTokenResult != null) {
+        String? token = idTokenResult.token;
+        DateTime? issueTime = idTokenResult.issuedAtTime;
+        DateTime? customExpirationTime = issueTime?.add(Duration(hours: 2));
 
-class _ProductsPageState extends State<ProductsPage> {
-  late final ProductRepository _productRepository;
-  late Future<List<Product>> _allProductsFuture;
+        if (token != null && customExpirationTime != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('idToken', token);
+          await prefs.setString('expirationTime', customExpirationTime.toIso8601String());
 
-  @override
-  void initState() {
-    super.initState();
-    _productRepository = ProductRepository();
-    _refreshProducts();
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text('Success'),
+                content: Text('Sign in successful!'),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ProductsPage()),
+                      );
+                    },
+                    child: Text('OK'),
+                  ),
+                ],
+              );
+            },
+          );
+        } else {
+          _showErrorDialog(context, 'Failed to retrieve token information.');
+        }
+      } else {
+        _showErrorDialog(context, 'Failed to retrieve token information.');
+      }
+    } catch (error) {
+      String errorMessage = 'Failed to sign in. Please try again.';
+      if (error is FirebaseAuthException) {
+        if (error.code == 'user-not-found') {
+          errorMessage = 'No user found with this email.';
+        } else if (error.code == 'wrong-password') {
+          errorMessage = 'Incorrect password.';
+        }
+      }
+      _showErrorDialog(context, errorMessage);
+    }
   }
 
-  void _refreshProducts() {
-    setState(() {
-      _allProductsFuture = _productRepository.getAllProducts();
-    });
+  void _showErrorDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Error'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Products'),
+        title: Text('Sign In'),
       ),
-      body: FutureBuilder<List<Product>>(
-        future: _allProductsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(
-              child: CircularProgressIndicator(),
-            );
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Text('Error: ${snapshot.error}'),
-            );
-          } else {
-            List<Product>? products = snapshot.data;
-            if (products == null || products.isEmpty) {
-              return Center(
-                child: Text('No products available.'),
-              );
-            } else {
-              return GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                ),
-                itemCount: products.length,
-                itemBuilder: (context, index) {
-                  return InkWell(
-                    onTap: () {
-                      //Navigator.push(context, MaterialPageRoute(builder: (context) => AnotherPage()));
-                    },
-                    child: GridTile(
-                      child: Image.network(products[index].imageUrl),
-                      footer: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 60.0, vertical: 0.1), // Adjust the vertical padding as needed
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(products[index].name),
-                            Text('Price: ${products[index].price.toString()}'),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              );
-
-
-            }
-          }
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _showCreateProductBottomSheet(context);
-        },
-        child: Icon(Icons.add),
-      ),
+      body: SignInForm(signIn: signIn),
     );
-  }
-
-  void _showCreateProductBottomSheet(BuildContext context) async {
-    final TextEditingController _productName = TextEditingController();
-    final TextEditingController _vendorName = TextEditingController();
-    final TextEditingController _price = TextEditingController();
-    final TextEditingController _category = TextEditingController();
-    final ImagePicker _picker = ImagePicker();
-    String? _imagePath;
-
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return Container(
-          padding: EdgeInsets.all(20),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Create Product',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 20),
-                TextField(
-                  controller: _productName,
-                  decoration: InputDecoration(labelText: 'Product Name'),
-                ),
-                TextField(
-                  controller: _vendorName,
-                  decoration: InputDecoration(labelText: 'Vendor Name'),
-                ),
-                TextField(
-                  controller: _price,
-                  decoration: InputDecoration(labelText: 'Price'),
-                  keyboardType: TextInputType.number,
-                ),
-                TextField(
-                  controller: _category,
-                  decoration: InputDecoration(labelText: 'Category'),
-                ),
-                SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () async {
-                    final XFile? pickedImage = await _picker.pickImage(
-                        source: ImageSource.gallery);
-                    if (pickedImage != null) {
-                      _imagePath = pickedImage.path;
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text('Image selected: $_imagePath'),
-                        duration: Duration(seconds: 2),
-                      ));
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text('No image selected.'),
-                        duration: Duration(seconds: 2),
-                      ));
-                    }
-                  },
-                  child: Text('Select Image'),
-                ),
-                SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () async {
-                    if (_imagePath != null && _productName.text.isNotEmpty &&
-                        _vendorName.text.isNotEmpty && _price.text.isNotEmpty &&
-                        _category.text.isNotEmpty) {
-                      // Upload image to Firebase Storage
-                      final imageUrl = await _uploadImageToStorage(_imagePath!);
-                      await _createProduct(
-                        context,
-                        _productName.text.trim(),
-                        _vendorName.text.trim(),
-                        double.parse(_price.text.trim()),
-                        _category.text.trim(),
-                        imageUrl,
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text(
-                            'Please fill all fields and select an image.'),
-                        duration: Duration(seconds: 2),
-                      ));
-                    }
-                  },
-                  child: Text('Create'),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<String> _uploadImageToStorage(String imagePath) async {
-    final file = File(imagePath);
-    final fileName = imagePath
-        .split('/')
-        .last;
-    final storageRef = FirebaseStorage.instance.ref().child(
-        'product_images/$fileName');
-    final uploadTask = storageRef.putFile(file);
-    final snapshot = await uploadTask.whenComplete(() {});
-    final downloadUrl = await snapshot.ref.getDownloadURL();
-    return downloadUrl;
-  }
-
-  Future<void> _createProduct(BuildContext context, String productName,
-      String vendorName, double price, String category, String imageUrl) async {
-    if (imageUrl.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Failed to upload image. Please try again.'),
-        duration: Duration(seconds: 2),
-      ));
-      return;
-    }
-
-    Product newProduct = Product(
-      name: productName,
-      vendorName: vendorName,
-      imageUrl: imageUrl,
-      price: price,
-      comments: [],
-      overallRating: 0.0,
-      category: category,
-      ratings: [],
-      description: '',
-    );
-
-    try {
-      await _productRepository.createProduct(newProduct);
-      _refreshProducts(); // Refresh products after creating a new one
-      Navigator.pop(context); // Close the bottom sheet after creating a product
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Product created successfully!'),
-        duration: Duration(seconds: 2),
-      ));
-    } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Failed to create product: $error'),
-        duration: Duration(seconds: 2),
-      ));
-    }
   }
 }
+
+class SignInForm extends StatefulWidget {
+  final Future<void> Function(BuildContext context, String email, String password) signIn;
+
+  SignInForm({required this.signIn});
+
+  @override
+  _SignInFormState createState() => _SignInFormState();
+}
+
+class _SignInFormState extends State<SignInForm> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.all(20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            controller: _emailController,
+            decoration: InputDecoration(labelText: 'Email'),
+          ),
+          TextFormField(
+            controller: _passwordController,
+            decoration: InputDecoration(labelText: 'Password'),
+            obscureText: true,
+          ),
+          SizedBox(height: 20.0),
+          ElevatedButton(
+            onPressed: () async {
+              final email = _emailController.text.trim();
+              final password = _passwordController.text;
+              await widget.signIn(context, email, password);
+            },
+            child: Text('Sign In'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
