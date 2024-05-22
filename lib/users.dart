@@ -10,6 +10,7 @@ class User {
   final String role;
   List<orders.Order> ordersList;
   List<Product> wishlist;
+  List<Product> cart;
 
   User({
     required this.uid,
@@ -18,6 +19,7 @@ class User {
     required this.role,
     this.ordersList = const [],
     this.wishlist = const [],
+    this.cart = const [],
   });
 
   void addOrder(orders.Order order) {
@@ -47,6 +49,9 @@ class User {
       wishlist: (data['wishlist'] as List<dynamic>)
           .map((item) => Product.fromFirestore(item))
           .toList(),
+      cart: (data['cart'] as List<dynamic>)
+          .map((item) => Product.fromFirestore(item))
+          .toList(),
     );
   }
 
@@ -58,9 +63,11 @@ class User {
       'role': role,
       'orders': ordersList.map((order) => order.toMap()).toList(),
       'wishlist': wishlist.map((product) => product.toFirestore()).toList(),
+      'cart': cart.map((product) => product.toFirestore()).toList(),
     };
   }
 }
+
 class UserRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String _collectionPath = 'users';
@@ -138,6 +145,44 @@ class UserRepository {
       return null;
     } catch (error) {
       throw Exception('Failed to get user role: $error');
+    }
+  }
+
+  Future<void> addToCart(String uid, Product product) async {
+    try {
+      await _firestore.collection(_collectionPath).doc(uid).update({
+        'cart': FieldValue.arrayUnion([product.toFirestore()])
+      });
+    } catch (error) {
+      throw Exception('Failed to add to cart: $error');
+    }
+  }
+
+  Future<void> removeFromCart(String uid, Product product) async {
+    try {
+      await _firestore.collection(_collectionPath).doc(uid).update({
+        'cart': FieldValue.arrayRemove([product.toFirestore()])
+      });
+    } catch (error) {
+      throw Exception('Failed to remove from cart: $error');
+    }
+  }
+
+  Future<List<Product>> getCart() async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid != null) {
+        final doc = await _firestore.collection(_collectionPath).doc(uid).get();
+        if (doc.exists) {
+          final data = doc.data();
+          return (data?['cart'] as List<dynamic>)
+              .map((item) => Product.fromFirestore(item))
+              .toList();
+        }
+      }
+      return [];
+    } catch (error) {
+      throw Exception('Failed to get cart: $error');
     }
   }
 }

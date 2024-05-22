@@ -5,19 +5,30 @@ import 'shipping.dart';
 import 'order.dart' as orders;
 
 class Cart {
-  List<Product> products = [];
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  void addProductToCart(Product product) {
-    products.add(product);
+  Future<void> addProductToCart(Product product) async {
+    User? currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      throw Exception('No user is currently signed in.');
+    }
+
+    String uid = currentUser.uid;
+
+    await _firestore.collection('users').doc(uid).update({
+      'cart': FieldValue.arrayUnion([product.toFirestore()])
+    });
   }
 
-  double calculateTotalPrice() {
+  Future<double> calculateTotalPrice() async {
+    List<Product> products = await _getCartProducts();
     double totalPrice = products.fold(0, (previousValue, product) => previousValue + product.price);
     return totalPrice + 3.99 + 2.00; // Add shipping of 3.99 and taxes of 2.00
   }
 
-  Map<String, dynamic> generateOrderSummary() {
-    double totalPrice = calculateTotalPrice();
+  Future<Map<String, dynamic>> generateOrderSummary() async {
+    double totalPrice = await calculateTotalPrice();
     double subtotal = totalPrice - 3.99 - 2.00;
     return {
       'subtotal': subtotal.toStringAsFixed(2),
@@ -27,37 +38,45 @@ class Cart {
     };
   }
 
-  List<Map<String, dynamic>> getCartContentsForDisplay() {
-    List<Map<String, dynamic>> cartContents = [];
-    for (var product in products) {
-      cartContents.add({
-        'name': product.name,
-        'image': product.image,
-        'price': product.price.toStringAsFixed(2),
-      });
-    }
-    return cartContents;
+  Future<List<Map<String, dynamic>>> getCartContentsForDisplay() async {
+    List<Product> products = await _getCartProducts();
+    return products.map((product) => {
+      'name': product.name,
+      'image': product.image,
+      'price': product.price.toStringAsFixed(2),
+    }).toList();
   }
 
   Future<void> placeOrder(Shipping shipping) async {
-    User? currentUser = FirebaseAuth.instance.currentUser;
+    User? currentUser = _auth.currentUser;
     if (currentUser == null) {
       throw Exception('No user is currently signed in.');
     }
     String uid = currentUser.uid;
 
+    List<Product> products = await _getCartProducts();
     orders.Order order = orders.Order(
-      products: List<Product>.from(products), // Create a new list to avoid issues with clearing
+      products: List<Product>.from(products),
       date: DateTime.now(),
-      totalPrice: calculateTotalPrice(),
+      totalPrice: await calculateTotalPrice(),
       shipping: shipping,
     );
 
-    await FirebaseFirestore.instance.collection('users').doc(uid).update({
-      'orders': FieldValue.arrayUnion([order.toMap()])
+    await _firestore.collection('users').doc(uid).update({
+      'orders': FieldValue.arrayUnion([order.toMap()]),
+      'cart': [] // Clear the cart
     });
-    
-    // Clear the cart after placing the order
-    products.clear();
+  }
+
+  Future<List<Product>> _getCartProducts() async {
+    User? currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      throw Exception('No user is currently signed in.');
+    }
+
+    String uid = currentUser.uid;
+    DocumentSnapshot<Map<String, dynamic>> snapshot = await _firestore.collection('users').doc(uid).get();
+    List<dynamic> cartData = snapshot.data()?['cart'] ?? [];
+    return cartData.map((item) => Product.fromFirestore(item)).toList();
   }
 }
