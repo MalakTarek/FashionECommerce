@@ -21,9 +21,11 @@ class Cart {
     });
   }
 
-  Future<double> calculateTotalPrice() async {
+    Future<double> calculateTotalPrice() async {
     List<Product> products = await _getCartProducts();
-    double totalPrice = products.fold(0, (previousValue, product) => previousValue + product.price);
+    double totalPrice = products.fold(0, (previousValue, product) => 
+      previousValue + (product.newPrice != 0 ? product.newPrice : product.price)
+    );
     return totalPrice + 3.99 + 2.00; // Add shipping of 3.99 and taxes of 2.00
   }
 
