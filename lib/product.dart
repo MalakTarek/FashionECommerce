@@ -30,7 +30,7 @@ class Product {
     required this.sizes,
     required this.unitsByColorAndSize,
     this.newPrice = 0.0,
-    this.isDiscounted = false,
+    this.isDiscounted = false, required List<double> ratings,
   });
 
   String getImage() {
@@ -88,15 +88,14 @@ class Product {
     return description;
   }
 
-  factory Product.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot) {
+    factory Product.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot) {
     final data = snapshot.data()!;
     return Product(
-      //id: snapshot.id,
       name: data['name'],
       vendorName: data['vendorName'],
       image: data['image'],
       price: data['price'],
-     category: CategoryExtension.fromString(data['category']),
+      category: CategoryExtension.fromString(data['category']),
       comments: List<String>.from(data['comments'] ?? []),
       overallRating: data['overallRating'].toDouble(),
       description: data['description'],
@@ -104,6 +103,7 @@ class Product {
       unitsByColorAndSize: Map<String, Map<String, int>>.from(data['unitsByColorAndSize'] ?? {}),
       newPrice: data['newPrice'].toDouble(),
       isDiscounted: data['isDiscounted'] ?? false,
+      ratings: List<double>.from(data['ratings'] ?? []),
     );
   }
 
@@ -121,10 +121,10 @@ class Product {
       'unitsByColorAndSize': unitsByColorAndSize,
       'newPrice': newPrice,
       'isDiscounted': isDiscounted,
+      'ratings': ratings,
     };
   }
 }
-
 class ProductRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
@@ -146,7 +146,7 @@ Future<void> createProduct(Product product) async {
           vendorName: vendorName,
           image: product.image,
           price: product.price,
-          category: product.category, comments: [], description: '', overallRating: 0, sizes: [], unitsByColorAndSize: {},
+          category: product.category, comments: [], description: '', overallRating: 0, sizes: [], unitsByColorAndSize: {}, ratings: [],
         );
 
         // Save the updated product to Firestore
@@ -252,7 +252,14 @@ Future<void> createProduct(Product product) async {
       if (doc.exists) {
         Product product = Product.fromFirestore(doc);
         product.addRating(rating);
-        await _firestore.collection(_collectionPath).doc(productId).update({'ratings': product.ratings});
+        double newOverallRating = product.calculateOverallRating();
+
+        await _firestore.collection(_collectionPath).doc(productId).update({
+          'ratings': product.ratings,
+          'overallRating': newOverallRating,
+        });
+      } else {
+        throw Exception('Product not found');
       }
     } catch (error) {
       throw Exception('Failed to rate product: $error');
