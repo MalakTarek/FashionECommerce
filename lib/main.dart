@@ -1,12 +1,22 @@
+<<<<<<< Updated upstream
 import 'package:fashion_ecommerce/products_page.dart';
+=======
+import 'package:fashion_ecommerce/Products/products_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+>>>>>>> Stashed changes
 import 'package:flutter/material.dart';
-import 'package:fashion_ecommerce/sign_up.dart';
-import 'package:fashion_ecommerce/sign_in.dart';
+import 'package:fashion_ecommerce/Registration/sign_up.dart';
+import 'package:fashion_ecommerce/Registration/sign_in.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+<<<<<<< Updated upstream
 import 'Allproducts.dart';
 import 'homepageDesign.dart';
+=======
+import 'Products/ViewProductsForNotLoggedInUsers.dart';
+import 'Design/homepageDesign.dart';
+>>>>>>> Stashed changes
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,6 +47,12 @@ Future<bool> checkTokenExpiration() async {
 
     if (expirationTime.isAfter(DateTime.now())) {
       return true;
+<<<<<<< Updated upstream
+=======
+    }else {
+      await FirebaseAuth.instance.signOut();
+
+>>>>>>> Stashed changes
     }
   }
   return false;
@@ -58,7 +74,11 @@ class MyApp extends StatelessWidget {
       routes: {
         '/signUp': (context) => SignUpPage(),
         '/signIn': (context) => SignInPage(),
+<<<<<<< Updated upstream
         '/viewProducts': (context) => ProductListScreen(),
+=======
+        '/viewProducts': (context) => ProductListScreenDesign(),
+>>>>>>> Stashed changes
       },
     );
   }
@@ -69,9 +89,16 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+<<<<<<< Updated upstream
         title: Text('A7a'),
+=======
+        title: Text('Fashion E-Commerece'),
+>>>>>>> Stashed changes
       ),
       body: CustomDesign(),
     );
   }
 }
+
+
+
