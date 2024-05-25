@@ -1,22 +1,16 @@
-<<<<<<< Updated upstream
 import 'package:fashion_ecommerce/products_page.dart';
-=======
 import 'package:fashion_ecommerce/Products/products_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
->>>>>>> Stashed changes
 import 'package:flutter/material.dart';
 import 'package:fashion_ecommerce/Registration/sign_up.dart';
 import 'package:fashion_ecommerce/Registration/sign_in.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-<<<<<<< Updated upstream
-import 'Allproducts.dart';
-import 'homepageDesign.dart';
-=======
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'dart:async';
 import 'Products/ViewProductsForNotLoggedInUsers.dart';
 import 'Design/homepageDesign.dart';
->>>>>>> Stashed changes
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,12 +41,8 @@ Future<bool> checkTokenExpiration() async {
 
     if (expirationTime.isAfter(DateTime.now())) {
       return true;
-<<<<<<< Updated upstream
-=======
-    }else {
+    } else {
       await FirebaseAuth.instance.signOut();
-
->>>>>>> Stashed changes
     }
   }
   return false;
@@ -70,17 +60,66 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: isSignedIn ? const ProductsPage() : HomePage(), // Conditional initial route
+      home: ConnectivityHandler(
+        child: isSignedIn ? const ProductsPage() : HomePage(),
+      ), // Conditional initial route
       routes: {
         '/signUp': (context) => SignUpPage(),
         '/signIn': (context) => SignInPage(),
-<<<<<<< Updated upstream
-        '/viewProducts': (context) => ProductListScreen(),
-=======
         '/viewProducts': (context) => ProductListScreenDesign(),
->>>>>>> Stashed changes
       },
     );
+  }
+}
+
+class ConnectivityHandler extends StatefulWidget {
+  final Widget child;
+
+  ConnectivityHandler({required this.child});
+
+  @override
+  _ConnectivityHandlerState createState() => _ConnectivityHandlerState();
+}
+
+class _ConnectivityHandlerState extends State<ConnectivityHandler> {
+  final Connectivity _connectivity = Connectivity();
+  StreamSubscription<ConnectivityResult>? _subscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscription = _connectivity.onConnectivityChanged.listen((result) {
+      if (result == ConnectivityResult.none) {
+        _showConnectionAlert();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+
+  void _showConnectionAlert() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Connection Error'),
+        content: Text('Unable to connect to the server. Please check your internet connection.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
   }
 }
 
@@ -89,16 +128,9 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-<<<<<<< Updated upstream
-        title: Text('A7a'),
-=======
-        title: Text('Fashion E-Commerece'),
->>>>>>> Stashed changes
+        title: Text('Fashion E-Commerce'),
       ),
       body: CustomDesign(),
     );
   }
 }
-
-
-
