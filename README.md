@@ -1,6 +1,7 @@
 # fashion_ecommerce
 
 A new Flutter project.
+(old version before migrating to another repo)
 
 ## Getting Started
 
